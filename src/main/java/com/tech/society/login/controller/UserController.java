@@ -9,11 +9,16 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/users")
-@RequiredArgsConstructor
 public class UserController {
 
     @Autowired
     private UserService userService;
+
+
+    @GetMapping("/health")
+    public ResponseEntity<?> health() {
+        return ResponseEntity.ok("Hello, welcome to Society Login Service..!!");
+    }
 
     // Register a new user
     @PostMapping("/register")
