@@ -1,90 +1,111 @@
 package com.tech.society.login.services;
 
+import com.tech.society.login.dto.AdminRegistrationRequest;
+import com.tech.society.login.dto.LoginRequestContext;
+import com.tech.society.login.dto.UserLoginRequest;
 import com.tech.society.login.models.User;
 import com.tech.society.login.repositories.UserRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.*;
 
 @Service
+@RequiredArgsConstructor
 public class UserService {
 
     @Autowired
-    private UserRepository userRepository;
+    UserRepository userRepository;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    MailService mailService;
 
-    // Register new user
-    public User registerUser(User user) {
-        user.setCustomId(generateCustomId());
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
-        user.setActive(true);
-        user.setCreatedDate(LocalDateTime.now(ZoneId.of("Asia/Kolkata")));
-        user.setModifiedDate(LocalDateTime.now(ZoneId.of("Asia/Kolkata")));
-        return userRepository.save(user);
-    }
-
-    // Login logic
-    public Optional<User> login(String username, String rawPassword) {
-        Optional<User> userOpt = userRepository.findByUsername(username);
-        if (userOpt.isPresent() && passwordEncoder.matches(rawPassword, userOpt.get().getPassword())) {
-            return userOpt;
+    public Object login(UserLoginRequest request, LoginRequestContext context) {
+        Optional<User> userOpt = userRepository.findByUsernameAndSocietyId(request.getUsername(), request.getSocietyId());
+        if (userOpt.isEmpty() || !userOpt.get().getPassword().equals(request.getPassword())) {
+            throw new RuntimeException("Invalid credentials");
         }
-        return Optional.empty();
+        mailService.sendLoginSuccessEmail(userOpt.get(), context);
+
+
+        return "Login successful!";
     }
 
-    // Forgot password request (generates a token)
-    public Optional<String> initiatePasswordReset(String email) {
-        Optional<User> userOpt = userRepository.findByEmail(email);
-        userOpt.ifPresent(user -> {
-            String token = UUID.randomUUID().toString();
-            user.setResetToken(token);
-            user.setModifiedDate(LocalDateTime.now(ZoneId.of("Asia/Kolkata")));
-            userRepository.save(user);
-        });
-        return userOpt.map(User::getResetToken);
-    }
-
-    // Reset password via token
-    public boolean resetPassword(String token, String newPassword) {
-        Optional<User> userOpt = userRepository.findByResetToken(token);
-        if (userOpt.isPresent()) {
-            User user = userOpt.get();
-            user.setPassword(passwordEncoder.encode(newPassword));
-            user.setResetToken(null);
-            user.setModifiedDate(LocalDateTime.now(ZoneId.of("Asia/Kolkata")));
-            userRepository.save(user);
-            return true;
+    public Object registerAdmin(AdminRegistrationRequest request) {
+        // Check if admin already exists for the given society
+        Optional<User> existing = userRepository.findByUsernameAndSocietyId(request.getUsername(), request.getSocietyId());
+        if (existing.isPresent()) {
+            throw new RuntimeException("Admin or user already exists with this username and society.");
         }
-        return false;
+
+        User admin = new User();
+        admin.setUsername(request.getUsername());
+        admin.setPassword(request.getPassword());  // Ideally encrypt the password
+        admin.setEmail(request.getEmail());
+        admin.setSocietyId(request.getSocietyId());
+        admin.setFirstLogin(true);
+        admin.setCreatedBy("SYSTEM");
+        admin.setCreatedDate(LocalDateTime.now());
+        admin.setMobileNumber(request.getAdminMobileNumber());
+        admin.setTokenExpiry(LocalDateTime.now().plusDays(2));
+        List<String> roles = new ArrayList<>();
+        roles.add("ADMIN");
+        admin.setRoles(roles);
+
+        userRepository.save(admin);
+
+        mailService.sendAdminRegistrationEmail(request);
+        return "Admin user created successfully.";
     }
 
-    // Forgot username
-    public Optional<String> getUsernameByEmail(String email) {
-        return userRepository.findByEmail(email).map(User::getUsername);
+    public Object forgotPassword(String username, String societyId, LoginRequestContext context) {
+        User user = userRepository.findByUsernameAndSocietyId(username, societyId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        String token = UUID.randomUUID().toString();
+        user.setResetToken(token);
+        userRepository.save(user);
+
+        mailService.sendResetTokenEmail(user, token, context);
+        return "Reset token sent to your registered email.";
     }
 
-    // Change password
-    public boolean changePassword(String username, String oldPassword, String newPassword) {
-        Optional<User> userOpt = userRepository.findByUsername(username);
-        if (userOpt.isPresent() && passwordEncoder.matches(oldPassword, userOpt.get().getPassword())) {
-            User user = userOpt.get();
-            user.setPassword(passwordEncoder.encode(newPassword));
-            user.setModifiedDate(LocalDateTime.now(ZoneId.of("Asia/Kolkata")));
-            userRepository.save(user);
-            return true;
+    public Object resetPasswordWithOld(String username, String oldPassword, String newPassword, String societyId, LoginRequestContext context) {
+        User user = userRepository.findByUsernameAndSocietyId(username, societyId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!user.getPassword().equals(oldPassword)) {
+            throw new RuntimeException("Old password does not match.");
         }
-        return false;
+
+        user.setPassword(newPassword);
+        userRepository.save(user);
+        mailService.sendPasswordChangedEmail(user, context);
+        return "Password changed successfully.";
     }
 
-    // Utility to generate custom numeric ID
-    private int generateCustomId() {
-        return (int) (System.currentTimeMillis() % Integer.MAX_VALUE);
+    public Object resetPasswordWithToken(String username, String token, String newPassword, String societyId, LoginRequestContext context) {
+        User user = userRepository.findByUsernameAndSocietyId(username, societyId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!token.equals(user.getResetToken())) {
+            throw new RuntimeException("Invalid reset token.");
+        }
+
+        user.setPassword(newPassword);
+        user.setResetToken(null); // Clear token after use
+        userRepository.save(user);
+        mailService.sendPasswordResetUsingTokenEmail(user, context);
+        return "Password reset successfully.";
+    }
+
+    public Object forgotUsername(String email, String societyId, LoginRequestContext context) {
+        User user = userRepository.findByEmailAndSocietyId(email, societyId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        mailService.sendUsernameReminderEmail(user, context);
+        return "Username sent to your registered email.";
     }
 }

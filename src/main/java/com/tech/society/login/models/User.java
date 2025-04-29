@@ -15,23 +15,18 @@ public class User {
 
     private Integer customId; // Custom numeric ID
     private String societyId; // Important for multi-society support
-
     private String username;    // Login ID (email/flatNo/mobile)
     private String password;    // Encrypted
     private String email;
     private String mobileNumber;
-
     private List<String> roles;     // e.g. ["RESIDENT"], ["ADMIN"]
     private boolean isFirstLogin = true;
     private boolean isActive = true;
-
     private Date lastLoginDate;
-
     private LocalDateTime createdDate;
     private String createdBy;
     private LocalDateTime modifiedDate;
     private String modifiedBy;
-
     private String resetToken;        // For forgot password flow
     private LocalDateTime tokenExpiry;
 
