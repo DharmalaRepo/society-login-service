@@ -1,7 +1,7 @@
 package com.tech.society.login.services;
 
 import com.tech.society.login.dto.AdminRegistrationRequest;
-import com.tech.society.login.dto.LoginRequestContext;
+import com.tech.society.login.dto.RequestContext;
 import com.tech.society.login.dto.UserLoginRequest;
 import com.tech.society.login.models.User;
 import com.tech.society.login.repositories.UserRepository;
@@ -22,7 +22,7 @@ public class UserService {
     @Autowired
     MailService mailService;
 
-    public Object login(UserLoginRequest request, LoginRequestContext context) {
+    public Object login(UserLoginRequest request, RequestContext context) {
         Optional<User> userOpt = userRepository.findByUsernameAndSocietyId(request.getUsername(), request.getSocietyId());
         if (userOpt.isEmpty() || !userOpt.get().getPassword().equals(request.getPassword())) {
             throw new RuntimeException("Invalid credentials");
@@ -30,7 +30,7 @@ public class UserService {
         mailService.sendLoginSuccessEmail(userOpt.get(), context);
 
 
-        return "Login successful!";
+        return userOpt;
     }
 
     public Object registerAdmin(AdminRegistrationRequest request) {
@@ -60,7 +60,18 @@ public class UserService {
         return "Admin user created successfully.";
     }
 
-    public Object forgotPassword(String username, String societyId, LoginRequestContext context) {
+    public Object registerUser(User request) {
+        Optional<User> existing = userRepository.findByUsernameAndSocietyId(request.getUsername(), request.getSocietyId());
+        if (existing.isPresent()) {
+            throw new RuntimeException("Admin or user already exists with this username and society.");
+        }
+        userRepository.save(request);
+
+        mailService.sendUserRegistrationEmail(request);
+        return request;
+    }
+
+    public Object forgotPassword(String username, String societyId, RequestContext context) {
         User user = userRepository.findByUsernameAndSocietyId(username, societyId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -72,7 +83,7 @@ public class UserService {
         return "Reset token sent to your registered email.";
     }
 
-    public Object resetPasswordWithOld(String username, String oldPassword, String newPassword, String societyId, LoginRequestContext context) {
+    public Object resetPasswordWithOld(String username, String oldPassword, String newPassword, String societyId, RequestContext context) {
         User user = userRepository.findByUsernameAndSocietyId(username, societyId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -86,7 +97,7 @@ public class UserService {
         return "Password changed successfully.";
     }
 
-    public Object resetPasswordWithToken(String username, String token, String newPassword, String societyId, LoginRequestContext context) {
+    public Object resetPasswordWithToken(String username, String token, String newPassword, String societyId, RequestContext context) {
         User user = userRepository.findByUsernameAndSocietyId(username, societyId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -101,7 +112,7 @@ public class UserService {
         return "Password reset successfully.";
     }
 
-    public Object forgotUsername(String email, String societyId, LoginRequestContext context) {
+    public Object forgotUsername(String email, String societyId, RequestContext context) {
         User user = userRepository.findByEmailAndSocietyId(email, societyId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 

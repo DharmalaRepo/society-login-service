@@ -12,13 +12,13 @@ public class User {
 
     @Id
     private String id; // Auto-generated MongoDB ObjectId
-
     private Integer customId; // Custom numeric ID
     private String societyId; // Important for multi-society support
     private String username;    // Login ID (email/flatNo/mobile)
     private String password;    // Encrypted
     private String email;
     private String mobileNumber;
+    private String userType;  //
     private List<String> roles;     // e.g. ["RESIDENT"], ["ADMIN"]
     private boolean isFirstLogin = true;
     private boolean isActive = true;
@@ -189,7 +189,13 @@ public class User {
         this.lastLoginDate = lastLoginDate;
     }
 
-    // Getters and Setters...
+    public String getUserType() {
+        return userType;
+    }
+
+    public void setUserType(String userType) {
+        this.userType = userType;
+    }
 
     @Override
     public String toString() {

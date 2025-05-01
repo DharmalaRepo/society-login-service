@@ -1,7 +1,7 @@
 package com.tech.society.login.controller;
 
 import com.tech.society.login.dto.AdminRegistrationRequest;
-import com.tech.society.login.dto.LoginRequestContext;
+import com.tech.society.login.dto.RequestContext;
 import com.tech.society.login.dto.UserLoginRequest;
 import com.tech.society.login.models.User;
 import com.tech.society.login.services.UserService;
@@ -29,11 +29,15 @@ public class UserController {
         return ResponseEntity.ok(userService.registerAdmin(request));
     }
 
+    @PostMapping("/register-user")
+    public ResponseEntity<?> registerUser(@RequestBody User request) {
+        return ResponseEntity.ok(userService.registerUser(request));
+    }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody UserLoginRequest request,
                                    HttpServletRequest httpRequest) {
-        LoginRequestContext context = extractContext(httpRequest);
+        RequestContext context = extractContext(httpRequest);
         return ResponseEntity.ok(userService.login(request, context));
     }
 
@@ -41,7 +45,7 @@ public class UserController {
     public ResponseEntity<?> forgotPassword(@RequestParam String username,
                                             @RequestParam String societyId,
                                             HttpServletRequest httpRequest) {
-        LoginRequestContext context = extractContext(httpRequest);
+        RequestContext context = extractContext(httpRequest);
         return ResponseEntity.ok(userService.forgotPassword(username, societyId, context));
     }
 
@@ -51,7 +55,7 @@ public class UserController {
                                                   @RequestParam String newPassword,
                                                   @RequestParam String societyId,
                                                   HttpServletRequest httpRequest) {
-        LoginRequestContext context = extractContext(httpRequest);
+        RequestContext context = extractContext(httpRequest);
         return ResponseEntity.ok(userService.resetPasswordWithOld(username, oldPassword, newPassword, societyId, context));
     }
 
@@ -61,7 +65,7 @@ public class UserController {
                                                     @RequestParam String newPassword,
                                                     @RequestParam String societyId,
                                                     HttpServletRequest httpRequest) {
-        LoginRequestContext context = extractContext(httpRequest);
+        RequestContext context = extractContext(httpRequest);
         return ResponseEntity.ok(userService.resetPasswordWithToken(username, token, newPassword, societyId, context));
     }
 
@@ -69,15 +73,18 @@ public class UserController {
     public ResponseEntity<?> forgotUsername(@RequestParam String email,
                                             @RequestParam String societyId,
                                             HttpServletRequest httpRequest) {
-        LoginRequestContext context = extractContext(httpRequest);
+        RequestContext context = extractContext(httpRequest);
         return ResponseEntity.ok(userService.forgotUsername(email, societyId, context));
     }
 
-    private LoginRequestContext extractContext(HttpServletRequest request) {
+    private RequestContext extractContext(HttpServletRequest request) {
         String societyId = request.getHeader("Society-Id");
         String ipAddress = request.getRemoteAddr();
         String requestTime = request.getHeader("Request-Time");
-        return new LoginRequestContext(societyId, ipAddress, requestTime);
+        String userName = request.getHeader("userName");
+        String userId = request.getHeader("userId");
+        String userType = request.getHeader("userType");
+        return new RequestContext(societyId, ipAddress, requestTime, userName, userId, userType);
     }
 
 
